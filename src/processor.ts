@@ -1,15 +1,5 @@
-import { lookupArchive } from "@subsquid/archive-registry";
-import * as ss58 from "@subsquid/ss58";
-import assert from "assert";
-import {
-  BatchContext,
-  BatchProcessorItem,
-  EventHandlerContext,
-  SubstrateBatchProcessor,
-  SubstrateProcessor
-} from "@subsquid/substrate-processor";
+import { SubstrateProcessor } from "@subsquid/substrate-processor";
 import { Store, TypeormDatabase } from "@subsquid/typeorm-store";
-import { AssetsInfoAssetsInfoStorage } from "./types/storage";
 import { AssetsInfo } from "./model/generated";
 
 const database = new TypeormDatabase();
@@ -21,17 +11,38 @@ processor.setDataSource({
   chain: "wss://mangata-x.api.onfinality.io/public-ws"
 });
 
-async function processTransfers(
-  ctx: EventHandlerContext<Store, { event: { args: true } }>
-) {
-  ctx.log.debug(`Debug Log example, ${ctx}`);
-}
+const correctId = (symbol: string) => {
+  switch (symbol) {
+    case "MGX":
+      return "0";
+    case "KSM":
+      return "4";
+    case "ETH":
+      return "1";
+    case "TKN0x00000004-TKN0x00000000":
+      return "5";
+    default:
+      return "";
+  }
+};
 
-processor.addPreHook({ range: { from: 0, to: 0 } }, async (ctx) => {
-  console.info("Context: This is working", ctx.block.id);
-  let assets = new AssetsInfoAssetsInfoStorage(ctx, ctx.block);
-  const ourAssets = await assets.getManyAsV1([0, 3]);
-  console.info("Assets", assets);
+processor.addPreHook(async (ctx) => {
+  const data: AssetsInfo[] = await ctx._chain.queryStorage(
+    "0x5a758b8d7516e692be6ba6f6d9749b8af6d2202bfaf0a1dfb48c9ab09bc9282b",
+    "AssetsInfo",
+    "AssetsInfo",
+    [0, 1, 4, 5].map((k) => [k])
+  );
+
+  data.forEach(async (d) => {
+    const assetInfo = new AssetsInfo();
+    assetInfo.id = correctId(d.symbol?.toString()!);
+    assetInfo.name = d.name?.toString()!;
+    assetInfo.description = d.description?.toString()!;
+    assetInfo.decimals = d.decimals!;
+    assetInfo.symbol = d.symbol?.toString()!;
+    await ctx.store.save(assetInfo);
+  });
 });
 
 processor.run();
