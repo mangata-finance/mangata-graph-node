@@ -1,15 +1,6 @@
-import { SubstrateProcessor } from "@subsquid/substrate-processor";
-import { Store, TypeormDatabase } from "@subsquid/typeorm-store";
+import { SubstrateBatchProcessor } from "@subsquid/substrate-processor";
+import { TypeormDatabase } from "@subsquid/typeorm-store";
 import { AssetsInfo } from "./model/generated";
-
-const database = new TypeormDatabase();
-const processor = new SubstrateProcessor(database);
-
-processor.setBatchSize(500);
-processor.setDataSource({
-  archive: "http://localhost:8888/graphql",
-  chain: "wss://mangata-x.api.onfinality.io/public-ws"
-});
 
 const correctId = (symbol: string) => {
   switch (symbol) {
@@ -26,7 +17,14 @@ const correctId = (symbol: string) => {
   }
 };
 
-processor.addPreHook(async (ctx) => {
+const processor = new SubstrateBatchProcessor()
+  .setBatchSize(500)
+  .setDataSource({
+    archive: "http://localhost:8888/graphql",
+    chain: "wss://mangata-x.api.onfinality.io/public-ws"
+  });
+
+processor.run(new TypeormDatabase(), async (ctx) => {
   const data: AssetsInfo[] = await ctx._chain.queryStorage(
     "0x5a758b8d7516e692be6ba6f6d9749b8af6d2202bfaf0a1dfb48c9ab09bc9282b",
     "AssetsInfo",
@@ -44,5 +42,3 @@ processor.addPreHook(async (ctx) => {
     await ctx.store.save(assetInfo);
   });
 });
-
-processor.run();
