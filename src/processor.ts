@@ -22,7 +22,8 @@ const processor = new SubstrateBatchProcessor()
   .setDataSource({
     archive: "http://localhost:8888/graphql",
     chain: "wss://mangata-x.api.onfinality.io/public-ws"
-  });
+  })
+  .includeAllBlocks();
 
 processor.run(new TypeormDatabase(), async (ctx) => {
   const data: AssetsInfo[] = await ctx._chain.queryStorage(
